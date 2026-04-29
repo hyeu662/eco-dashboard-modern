@@ -6,9 +6,9 @@ import {
   LineChart, Line, BarChart, Bar, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell
 } from "recharts";
-import { ChevronDown, Activity, Wind, Trees, Target, DollarSign, Zap, TrendingUp, ShieldAlert, ListOrdered, Info, BrainCircuit, Target as TargetIcon } from "lucide-react";
+import { ChevronDown, Zap, TrendingUp, ShieldAlert, BrainCircuit, Target as TargetIcon } from "lucide-react";
 
-/* ── Leaflet 기본 설정 ── */
+/* ── Leaflet 기본 아이콘 설정 ── */
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
@@ -35,9 +35,7 @@ const createTreeIcon = (color, size) => {
   });
 };
 
-/* ══════════════════════════════════════
-    데이터 세팅 (실시설계 및 i-Tree 분석 기반)
-══════════════════════════════════════ */
+/* ── 데이터 세팅 ── */
 const REAL_SPECIES_DATA = [
   { name: "소나무", count: 258, storage: 3.36, sequestration: 0.395, countPct: 21.3, storagePct: 38.9, color: "#14532d" },
   { name: "이팝나무", count: 151, storage: 2.08, sequestration: 0.423, countPct: 12.4, storagePct: 24.1, color: "#166534" },
@@ -67,28 +65,64 @@ const SCENARIO_DATA = {
   worst: [{year:"현재",v:0.756},{year:"5년",v:2.24},{year:"10년",v:2.47},{year:"20년",v:2.47},{year:"30년",v:2.12}]
 };
 
-/* ── 📍 행정구역 레이어 (파일 경로 수정) ── */
+/* ── 📍 레이어 컴포넌트 ── */
+/* ── 📍 행정구역 및 공원 레이어 (가시성 강화 버전) ── */
 function BoundaryLayer() {
   const [gjData, setGjData] = useState(null);
   const [hsData, setHsData] = useState(null);
+  const [parkData, setParkData] = useState(null);
+
   useEffect(() => {
-    fetch("./gyeongju.geojson").then(res => res.json()).then(data => setGjData(data)).catch(() => {});
-    fetch("./hwangseong.geojson").then(res => res.json()).then(data => setHsData(data)).catch(() => {});
+    // 파일을 확실히 불러오기 위해 경로를 "/"로 고정
+    const loadLayer = (url, setter) => {
+      fetch(url)
+        .then(res => {
+          if (!res.ok) throw new Error("파일을 찾을 수 없음");
+          return res.json();
+        })
+        .then(data => setter(data))
+        .catch(err => console.warn(`${url} 로드 실패:`, err));
+    };
+
+    loadLayer("/gyeongju.geojson", setGjData);
+    loadLayer("/hwangseong.geojson", setHsData);
+    loadLayer("/hwang-park.geojson", setParkData);
   }, []);
+
   return (
     <>
-      {gjData && <GeoJSON data={gjData} style={{ color: "#64748b", weight: 2, fillColor: "transparent", dashArray: "10, 10" }} />}
-      {hsData && <GeoJSON data={hsData} style={{ color: "#166534", weight: 3, fillColor: "#4ade80", fillOpacity: 0.1 }} />}
+      {/* 1. 경주시: 가장 넓은 범위 (진한 회색 실선으로 변경) */}
+      {gjData && (
+        <GeoJSON 
+          data={gjData} 
+          style={{ color: "#475569", weight: 3, fillOpacity: 0, dashArray: "10, 10" }} 
+        />
+      )}
+      
+      {/* 2. 황성동: 중간 범위 (보라색 계열로 구분감 추가) */}
+      {hsData && (
+        <GeoJSON 
+          data={hsData} 
+          style={{ color: "#6366f1", weight: 3, fillOpacity: 0 }} 
+        />
+      )}
+      
+      {/* 3. 황성공원: 내가 직접 딴 정밀 구역 (가장 진한 녹색 + 채우기) */}
+      {parkData && (
+        <GeoJSON 
+          data={parkData} 
+          style={{ color: "#064e3b", weight: 5, fillColor: "#22c55e", fillOpacity: 0.3 }} 
+        />
+      )}
     </>
   );
 }
 
-/* ── 📊 수종 구성용 한글 툴팁 ── */
 const CompositionTooltip = ({ active, payload }) => {
   if (active && payload && payload.length) {
     const data = payload[0].payload;
     return (
-      <div style={{ backgroundColor: "#1e293b", color: "#fff", padding: "12px", borderRadius: "8px", fontSize: "12px", boxShadow: "0 10px 15px rgba(0,0,0,0.2)" }}>
+      <div style={{ backgroundColor: "#1e293b", color: "#fff", padding: "12px", borderRadius: "8px", fontSize: "12px" }}>
         <p style={{ fontWeight: 800, color: data.color, marginBottom: 5 }}>{data.name}</p>
         <p>비중: {data.countPct}% ({data.count}주)</p>
         {data.desc && <p style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid #475569", color: "#cbd5e1" }}>{data.desc}</p>}
@@ -108,7 +142,7 @@ const CSS = `
   .nav-container { display: flex; gap: 40px; height: 100%; align-items: center; }
   .menu-item { position: relative; height: 100%; display: flex; align-items: center; cursor: pointer; }
   .menu-label { font-weight: 800; font-size: 14px; color: #475569; display: flex; align-items: center; gap: 5px; }
-  .menu-label:hover, .menu-label.active { color: var(--main); font-weight: 900; }
+  .menu-label.active { color: var(--main); font-weight: 900; }
   .dropdown { position: absolute; top: 70px; right: 0; width: 200px; background: white; border: 1px solid #eee; border-radius: 0 0 12px 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); display: none; flex-direction: column; overflow: hidden; }
   .menu-item:hover .dropdown { display: flex; }
   .sub-btn { padding: 14px 20px; font-size: 13px; font-weight: 700; color: #64748b; text-align: left; border: none; background: none; cursor: pointer; }
@@ -208,7 +242,7 @@ export default function App() {
                   <div style={{fontWeight: 900, color: 'var(--main)', marginBottom: 8, display:'flex', alignItems:'center', gap:5, fontSize: 16}}><TargetIcon size={18}/> 탄소 분석 시뮬레이션</div>
                   <div style={{fontSize: 12, color: '#64748b', lineHeight: 1.5}}>둥근 나무 아이콘에 마우스를 올리면<br/>구역별 상세 진단 결과가 나타납니다.</div>
                 </div>
-                <MapContainer center={[35.858, 129.213]} zoom={15} style={{height:'100%', borderRadius:12}}>
+                <MapContainer center={[35.858, 129.213]} zoom={15.5} style={{height:'100%', borderRadius:12}}>
                   <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                   <BoundaryLayer />
                   {CARBON_HOTSPOTS.map(spot => (
@@ -273,12 +307,10 @@ export default function App() {
                </div>
             )}
             {sub === "diag" && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', flex: 1 }}>
-                <div className="card" style={{ borderLeft: '12px solid #ef4444', justifyContent: 'center', height: '140px', flex: 'none' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-                    <div style={{ background: '#fee2e2', padding: 15, borderRadius: '50%' }}><BrainCircuit color="#ef4444" size={35}/></div>
-                    <div><div style={{ fontSize: 15, fontWeight: 800, color: '#ef4444' }}>AI 권고</div><div style={{ fontSize: 22, fontWeight: 900 }}>탄소 효율 극대화를 위해 느티나무 식재 확대가 필요합니다.</div></div>
-                  </div>
+              <div className="card" style={{ borderLeft: '12px solid #ef4444', justifyContent: 'center', height: '140px', flex: 'none' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+                  <div style={{ background: '#fee2e2', padding: 15, borderRadius: '50%' }}><BrainCircuit color="#ef4444" size={35}/></div>
+                  <div><div style={{ fontSize: 15, fontWeight: 800, color: '#ef4444' }}>AI 권고</div><div style={{ fontSize: 22, fontWeight: 900 }}>탄소 효율 극대화를 위해 느티나무 식재 확대가 필요합니다.</div></div>
                 </div>
               </div>
             )}
